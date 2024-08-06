@@ -1,24 +1,30 @@
-#include <LiquidCrystal_I2C.h>
 #include <Wire.h>
-
-LiquidCrystal_I2C lcd(0x27, 16, 2);
-
+#include <LiquidCrystal_I2C.h>
 #include <Servo.h>
-Servo myservo;
-int IR1 = 2;
-int IR2 = 3;
-int Slot = 4;  // Total number of parking Slots
-int flag1 = 0;
-int flag2 = 0;
+
+// Constants
+const int IR_SENSOR1_PIN = 2;
+const int IR_SENSOR2_PIN = 3;
+const int SERVO_PIN = 4;
+const int SLOT_COUNT = 4;
+const int SERVO_OPEN_ANGLE = 0;
+const int SERVO_CLOSED_ANGLE = 100;
+
+// Variables
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+Servo servo;
+int slotCount = SLOT_COUNT;
+bool irSensor1Triggered = false;
+bool irSensor2Triggered = false;
 
 void setup() {
   Serial.begin(9600);
-  lcd.init();       // initialize the lcd
-  lcd.backlight();  // open the backlight
-  pinMode(IR1, INPUT);
-  pinMode(IR2, INPUT);
-  myservo.attach(4);
-  myservo.write(100);
+  lcd.init();
+  lcd.backlight();
+  pinMode(IR_SENSOR1_PIN, INPUT);
+  pinMode(IR_SENSOR2_PIN, INPUT);
+  servo.attach(SERVO_PIN);
+  servo.write(SERVO_CLOSED_ANGLE);
   lcd.setCursor(0, 0);
   lcd.print("     ARDUINO    ");
   lcd.setCursor(0, 1);
@@ -26,14 +32,14 @@ void setup() {
   delay(2000);
   lcd.clear();
 }
+
 void loop() {
-  if (digitalRead(IR1) == LOW && flag1 == 0) {
-    if (Slot > 0) {
-      flag1 = 1;
-      if (flag2 == 0) {
-        myservo.write(0);
-        Slot = Slot - 1;
-      }
+  // Check IR sensors
+  if (digitalRead(IR_SENSOR1_PIN) == LOW && !irSensor1Triggered) {
+    irSensor1Triggered = true;
+    if (slotCount > 0) {
+      servo.write(SERVO_OPEN_ANGLE);
+      slotCount--;
     } else {
       lcd.setCursor(0, 0);
       lcd.print("    SORRY :(    ");
@@ -43,21 +49,27 @@ void loop() {
       lcd.clear();
     }
   }
-  if (digitalRead(IR2) == LOW && flag2 == 0) {
-    flag2 = 1;
-    if (flag1 == 0) {
-      myservo.write(0);
-      Slot = Slot + 1;
+
+  if (digitalRead(IR_SENSOR2_PIN) == LOW && !irSensor2Triggered) {
+    irSensor2Triggered = true;
+    if (!irSensor1Triggered) {
+      servo.write(SERVO_OPEN_ANGLE);
+      slotCount++;
     }
   }
-  if (flag1 == 1 && flag2 == 1) {
+
+  // Reset servo and flags
+  if (irSensor1Triggered && irSensor2Triggered) {
     delay(1000);
-    myservo.write(100);
-    flag1 = 0, flag2 = 0;
+    servo.write(SERVO_CLOSED_ANGLE);
+    irSensor1Triggered = false;
+    irSensor2Triggered = false;
   }
+
+  // Update LCD display
   lcd.setCursor(0, 0);
   lcd.print("    WELCOME!    ");
   lcd.setCursor(0, 1);
   lcd.print("Slot Left: ");
-  lcd.print(Slot);
+  lcd.print(slotCount);
 }
